@@ -1,0 +1,65 @@
+
+name: Build OrcaGlass APK
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Compile OrcaGlass
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Télécharger le projet
+        uses: actions/checkout@v7
+
+      - name: Trouver le dossier Android
+        id: project
+        run: |
+          if [ -f "settings.gradle.kts" ]; then
+            echo "project_dir=." >> "$GITHUB_OUTPUT"
+          elif [ -f "OrcaGlass/settings.gradle.kts" ]; then
+            echo "project_dir=OrcaGlass" >> "$GITHUB_OUTPUT"
+          else
+            echo "Projet Android introuvable"
+            exit 1
+          fi
+
+      - name: Installer Java 17
+        uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Installer Gradle 8.9
+        uses: gradle/actions/setup-gradle@v6
+        with:
+          gradle-version: '8.9'
+
+      - name: Installer Android SDK
+        uses: android-actions/setup-android@v4
+
+      - name: Installer Android SDK 35
+        run: |
+          sdkmanager --install \
+            "platforms;android-35" \
+            "build-tools;35.0.0"
+
+      - name: Compiler OrcaGlass
+        working-directory: ${{ steps.project.outputs.project_dir }}
+        run: |
+          gradle --no-daemon --stacktrace assembleDebug
+
+      - name: Récupérer le fichier APK
+        uses: actions/upload-artifact@v7
+        with:
+          name: OrcaGlass-APK
+          path: ${{ steps.project.outputs.project_dir }}/app/build/outputs/apk/debug/*.apk
+          if-no-files-found: error
+          retention-days: 14
